@@ -1,0 +1,15 @@
+{
+  "name": "pistol-run",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "小手枪快跑 - KARDS 二创自动射击肉鸽",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.4.10"
+  }
+}
