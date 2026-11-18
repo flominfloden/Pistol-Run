@@ -35,31 +35,56 @@ export const faceUrl = (id) => F + id + ".webp";
 export const draftUrl = (id) => D + id + ".webp";
 export const bgUrl = (name, portrait) => B + name + (portrait ? "-tall" : "") + ".webp";
 
-export async function preloadBg(name) {
-  await loadImage(bgUrl(name, false));
-  await loadImage(bgUrl(name, true));
-}
-
-export async function preload(ids, bgName, onProgress) {
-  const list = [];
-  for (const id of ids) list.push(artUrl(id));
-  list.push(bgUrl(bgName, false));
-  list.push(bgUrl(bgName, true));
-  list.push(B + "cardback.webp");
-
+/**
+ * 关键资源：只等这些就开局，剩下的后台补。
+ * 网络慢时不能把玩家卡在 40 秒白屏上。
+ */
+export async function preloadCritical(heroId, bgName, onProgress) {
+  const list = [
+    bgUrl(bgName, false),
+    bgUrl(bgName, true),
+    artUrl(heroId),
+  ];
   let done = 0;
-  const total = list.length;
   await Promise.all(
     list.map((u) =>
       loadImage(u).then(() => {
         done++;
-        if (onProgress) onProgress(done / total);
+        if (onProgress) onProgress(done / list.length);
       })
     )
   );
-  return { ok: cache.size };
 }
 
-export async function preloadFaces(ids) {
-  await Promise.all(ids.map((id) => loadImage(faceUrl(id))));
+/**
+ * 后台补齐：不阻塞流程，失败也无声。
+ * 限制并发，避免把刚开局的首帧挤掉。
+ */
+export function preloadRest(ids, bgName, concurrency = 6) {
+  const queue = [];
+  for (const id of ids) {
+    // 首波用不到立绘，先只补原画
+    queue.push(artUrl(id));
+  }
+  queue.push(B + "cardback.webp");
+
+  let cursor = 0;
+  const workers = Array.from({ length: concurrency }, async () => {
+    while (cursor < queue.length) {
+      const u = queue[cursor++];
+      if (cache.has(u)) continue;
+      await loadImage(u);
+    }
+  });
+  return Promise.all(workers);
+}
+
+/** 选卡界面打开前调用：补 3 张卡面，不阻塞整波 */
+export function preloadFaces(ids) {
+  return Promise.all(ids.map((id) => loadImage(faceUrl(id))));
+}
+
+/** 选卡也优先用 draft 图（更小），失败回退到 face */
+export function preloadDraft(ids) {
+  return Promise.all(ids.map((id) => loadImage(draftUrl(id))));
 }

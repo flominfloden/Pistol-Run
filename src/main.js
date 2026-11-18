@@ -2,7 +2,7 @@ import "./style.css";
 import { Game } from "./core/game.js";
 import { Renderer } from "./core/renderer.js";
 import { Input } from "./core/input.js";
-import { preload, preloadFaces, artUrl } from "./core/assets.js";
+import { preloadCritical, preloadRest, preloadFaces, preloadDraft, artUrl } from "./core/assets.js";
 import { initAudio, resumeAudio, play } from "./core/audio.js";
 import { loadSave, writeSave, META_UPGRADES } from "./core/save.js";
 import { Hud, formatNum } from "./ui/hud.js";
@@ -54,10 +54,14 @@ class App {
   }
 
   async startPreload() {
-    const bg = BG_NAMES[0];
-    await preload(FACE_IDS, bg);
-    await preloadFaces(FACE_IDS.slice(0, 40));
+    // 菜单只等一张背景，别让首屏卡在网络上
+    await preloadCritical("no_10_commando", BG_NAMES[0]);
     this.ready = true;
+    // 其余资源后台悄悄补，不阻塞任何操作
+    preloadRest(FACE_IDS, BG_NAMES[0]).then(() => {
+      preloadFaces(FACE_IDS);
+      preloadDraft(CARDS.map((c) => c.id));
+    });
   }
 
   resize() {
@@ -167,32 +171,49 @@ class App {
 
   // ── 流程 ────────────────────────────────────────────────────────
   async startRun() {
+    if (this._starting) return;
+    this._starting = true;
+
     initAudio();
     resumeAudio();
     play("pack", { gain: 0.3, rate: 1.15, throttleMs: 0 });
 
+    // 加载态：慢网下也要让玩家看到反应
+    const startBtn = $("btn-start");
+    const startLabel = startBtn.textContent;
+    startBtn.disabled = true;
+    startBtn.textContent = "装载中";
+
     $("menu").classList.add("hidden");
     $("over").classList.add("hidden");
     $("draft").classList.add("hidden");
-    this.hud.show();
-    this.hud.setBoss(null);
 
-    this.bgName = BG_NAMES[(Math.random() * BG_NAMES.length) | 0];
-    await preload(FACE_IDS, this.bgName);
-    await preloadFaces(FACE_IDS);
+    try {
+      this.bgName = BG_NAMES[(Math.random() * BG_NAMES.length) | 0];
+      // 只等背景 + 主角原画，其余在后台补，避免慢网下白屏几十秒
+      await preloadCritical("no_10_commando", this.bgName);
+      preloadRest(FACE_IDS, this.bgName);
 
-    this.game = new Game({
-      meta: this.save.meta,
-      worldW: this.renderer.worldW,
-      worldH: this.renderer.worldH,
-      onEvent: (ev) => this.onGameEvent(ev),
-    });
-    this.save.runs++;
-    writeSave(this.save);
+      this.hud.show();
+      this.hud.setBoss(null);
 
-    this.state = "playing";
-    this.pendingWaveClear = false;
-    this.game.start();
+      this.game = new Game({
+        meta: this.save.meta,
+        worldW: this.renderer.worldW,
+        worldH: this.renderer.worldH,
+        onEvent: (ev) => this.onGameEvent(ev),
+      });
+      this.save.runs++;
+      writeSave(this.save);
+
+      this.state = "playing";
+      this.pendingWaveClear = false;
+      this.game.start();
+    } finally {
+      startBtn.disabled = false;
+      startBtn.textContent = startLabel;
+      this._starting = false;
+    }
 
     this.hud.set(1, 0, 0);
     this.hud.setBuild([]);
@@ -226,14 +247,20 @@ class App {
     this.hud.hide();
     this.hud.setBoss(null);
     this.draftCards = makeDraft();
-    $("draft-kicker").textContent = `第 ${wave} 波肃清`;
-    $("reroll-cost").textContent = this.game.rerollCost;
-    $("btn-reroll").disabled = this.game.gold < this.game.rerollCost;
-    $("draft").classList.remove("hidden");
-    renderDraft($("draft-cards"), this.draftCards, this.game.build, (card, el) => {
-      this.pickCard(card, el);
-    });
-    play("flip", { gain: 0.35, rate: 1.0, throttleMs: 0 });
+
+    const show = () => {
+      $("draft-kicker").textContent = `第 ${wave} 波肃清`;
+      $("reroll-cost").textContent = this.game.rerollCost;
+      $("btn-reroll").disabled = this.game.gold < this.game.rerollCost;
+      $("draft").classList.remove("hidden");
+      renderDraft($("draft-cards"), this.draftCards, this.game.build, (card, el) => {
+        this.pickCard(card, el);
+      });
+      play("flip", { gain: 0.35, rate: 1.0, throttleMs: 0 });
+    };
+
+    // 卡面到手再显示，慢网下也看不到空白卡
+    preloadDraft(this.draftCards.map((c) => c.id)).then(show);
   }
 
   pickCard(card, el) {
@@ -259,10 +286,12 @@ class App {
     $("reroll-cost").textContent = this.game.rerollCost;
     $("btn-reroll").disabled = this.game.gold < this.game.rerollCost;
     this.draftCards = makeDraft();
-    renderDraft($("draft-cards"), this.draftCards, this.game.build, (card, el) => {
-      this.pickCard(card, el);
+    preloadDraft(this.draftCards.map((c) => c.id)).then(() => {
+      renderDraft($("draft-cards"), this.draftCards, this.game.build, (card, el) => {
+        this.pickCard(card, el);
+      });
+      play("flip", { gain: 0.3, rate: 1.25, throttleMs: 0 });
     });
-    play("flip", { gain: 0.3, rate: 1.25, throttleMs: 0 });
   }
 
   skipDraft() {
