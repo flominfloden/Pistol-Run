@@ -53,16 +53,32 @@ export function renderDraft(container, cards, owned, onPick) {
 
     const img = document.createElement("img");
     img.className = "face";
-    img.src = draftUrl(card.id);
     img.alt = card.zh;
     img.draggable = false;
-    img.onerror = () => {
-      img.style.visibility = "hidden";
-      btn.style.background = NATION[card.nation]?.color || "#2a2c22";
+
+    // 先用国家色占位，图到了自然顶上；慢网下也不会看起来像卡死
+    btn.style.background = NATION[card.nation]?.color || "#2a2c22";
+    img.style.opacity = "0";
+    img.style.transition = "opacity .18s";
+    img.onload = () => {
+      img.style.opacity = "1";
+      fallback.style.opacity = "0";
     };
+    img.onerror = () => {
+      img.remove();
+    };
+    img.src = draftUrl(card.id);
 
     const rar = document.createElement("i");
     rar.className = "rar " + card.rarity;
+
+    // 占位态：图没到也能看清是哪张卡
+    const fallback = document.createElement("div");
+    fallback.className = "skel";
+    fallback.innerHTML =
+      `<span class="skel-cost">${card.cost}</span>` +
+      `<span class="skel-name">${card.zh}</span>` +
+      `<span class="skel-type">${TYPE_ZH[card.type] || ""} · ${RARITY_LABEL[card.rarity]}</span>`;
 
     const buff = document.createElement("div");
     buff.className = "buff";
@@ -74,7 +90,7 @@ export function renderDraft(container, cards, owned, onPick) {
     tag.textContent = ownedCount ? `已叠加 ×${ownedCount}` : TYPE_ZH[card.type] || "强化";
     buff.append(effEl, tag);
 
-    btn.append(img, rar, buff);
+    btn.append(fallback, img, rar, buff);
     btn.addEventListener("click", () => onPick(card, btn));
     container.appendChild(btn);
   });

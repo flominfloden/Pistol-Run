@@ -248,19 +248,17 @@ class App {
     this.hud.setBoss(null);
     this.draftCards = makeDraft();
 
-    const show = () => {
-      $("draft-kicker").textContent = `第 ${wave} 波肃清`;
-      $("reroll-cost").textContent = this.game.rerollCost;
-      $("btn-reroll").disabled = this.game.gold < this.game.rerollCost;
-      $("draft").classList.remove("hidden");
-      renderDraft($("draft-cards"), this.draftCards, this.game.build, (card, el) => {
-        this.pickCard(card, el);
-      });
-      play("flip", { gain: 0.35, rate: 1.0, throttleMs: 0 });
-    };
+    $("draft-kicker").textContent = `第 ${wave} 波肃清`;
+    $("reroll-cost").textContent = this.game.rerollCost;
+    $("btn-reroll").disabled = this.game.gold < this.game.rerollCost;
+    $("draft").classList.remove("hidden");
+    renderDraft($("draft-cards"), this.draftCards, this.game.build, (card, el) => {
+      this.pickCard(card, el);
+    });
+    play("flip", { gain: 0.35, rate: 1.0, throttleMs: 0 });
 
-    // 卡面到手再显示，慢网下也看不到空白卡
-    preloadDraft(this.draftCards.map((c) => c.id)).then(show);
+    // 只把卡面拉过来，不阻塞界面；占位会先顶上
+    preloadDraft(this.draftCards.map((c) => c.id));
   }
 
   pickCard(card, el) {
@@ -286,12 +284,11 @@ class App {
     $("reroll-cost").textContent = this.game.rerollCost;
     $("btn-reroll").disabled = this.game.gold < this.game.rerollCost;
     this.draftCards = makeDraft();
-    preloadDraft(this.draftCards.map((c) => c.id)).then(() => {
-      renderDraft($("draft-cards"), this.draftCards, this.game.build, (card, el) => {
-        this.pickCard(card, el);
-      });
-      play("flip", { gain: 0.3, rate: 1.25, throttleMs: 0 });
+    renderDraft($("draft-cards"), this.draftCards, this.game.build, (card, el) => {
+      this.pickCard(card, el);
     });
+    play("flip", { gain: 0.3, rate: 1.25, throttleMs: 0 });
+    preloadDraft(this.draftCards.map((c) => c.id));
   }
 
   skipDraft() {
