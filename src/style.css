@@ -555,7 +555,7 @@ html, body {
 
 .draft-card img.face {
   position: relative;
-  z-index: 1;
+  z-index: 0;
   width: 100%;
   height: 100%;
   display: block;
@@ -610,6 +610,7 @@ html, body {
   border-radius: 50%;
   background: var(--brass);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 8px rgba(185, 154, 82, 0.5);
+  z-index: 3;
 }
 .draft-card .rar.Elite { background: #e8cd85; box-shadow: 0 0 0 1px rgba(0,0,0,.6), 0 0 10px rgba(232,205,133,.8); }
 .draft-card .rar.Special { background: #b8bcb2; }
@@ -619,6 +620,7 @@ html, body {
 .draft-card .buff {
   position: absolute;
   inset: auto 0 0 0;
+  z-index: 2;
   padding: 22px 9px 9px;
   background: linear-gradient(180deg, rgba(12, 13, 9, 0) 0%, rgba(12, 13, 9, 0.9) 42%, rgba(12, 13, 9, 0.98) 100%);
   text-align: left;
